@@ -1,13 +1,16 @@
 const express = require("express");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
-const cors = require("cors"); // ✅ ADD THIS
+const cors = require("cors");
 require("dotenv").config();
 
 const app = express();
 
-// ✅ CORS ENABLE (IMPORTANT)
-app.use(cors());
+// ✅ CORS FIX (IMPORTANT)
+app.use(cors({
+  origin: "*"
+}));
+
 app.use(express.json());
 
 const razorpay = new Razorpay({
@@ -15,49 +18,42 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// Test route
 app.get("/", (req, res) => {
   res.send("Glamora Backend Running 🚀");
 });
 
-// Create order
+// ✅ CREATE ORDER (POST)
 app.post("/create-order", async (req, res) => {
   try {
     const order = await razorpay.orders.create({
       amount: req.body.amount * 100,
       currency: "INR",
     });
-    res.json(order);
-  } catch (error) {
-    console.log(error);
+
+    res.json({
+      success: true,
+      order: order
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Order creation failed" });
   }
 });
 
-// Verify payment
+// ✅ VERIFY PAYMENT
 app.post("/verify-payment", (req, res) => {
-  try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
 
-    const expected = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body)
-      .digest("hex");
+  const expected = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(body)
+    .digest("hex");
 
-    if (expected === razorpay_signature) {
-      res.json({ success: true });
-    } else {
-      res.json({ success: false });
-    }
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ error: "Verification failed" });
-  }
+  res.json({ success: expected === razorpay_signature });
 });
 
-// Start server
 app.listen(process.env.PORT || 5000, () =>
   console.log("Server Started 🚀")
 );
