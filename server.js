@@ -8,10 +8,7 @@ const app = express();
 
 // ✅ CORS FIX (IMPORTANT)
 app.use(cors({
-  origin: [
-    "https://aistudio.google.com",
-    "http://localhost:5173"
-  ],
+  origin: true,
   methods: ["GET", "POST"],
   credentials: true
 }));
