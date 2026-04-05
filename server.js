@@ -82,14 +82,11 @@ app.post("/verify-payment", (req, res) => {
     const isValid = expected === razorpay_signature;
 
     if (isValid && userId) {
-      // ✅ Save premium user
       users[userId] = {
         isPremium: true,
         paymentId: razorpay_payment_id,
-        updatedAt: new Date()
       };
-
-      console.log("✅ PREMIUM ACTIVATED:", users[userId]);
+      console.log("✅ PREMIUM SAVED:", users[userId]);
     }
 
     res.json({ success: isValid });
@@ -108,7 +105,6 @@ app.get("/check-premium/:userId", (req, res) => {
     isPremium: user?.isPremium || false
   });
 });
-
 // ✅ START SERVER
 app.listen(process.env.PORT || 5000, () => {
   console.log("🚀 Server Started");
