@@ -27,17 +27,26 @@ app.get("/", (req, res) => {
 // ✅ CREATE ORDER (POST)
 app.post("/create-order", async (req, res) => {
   try {
-    const order = await razorpay.orders.create({
-      amount: req.body.amount * 100,
+    const { amount } = req.body;
+
+    const options = {
+      amount: amount * 100, // ₹ to paise
       currency: "INR",
-    });
+      receipt: "receipt_order_" + Date.now(),
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    console.log("ORDER CREATED:", order); // DEBUG
 
     res.json({
-      success: true,
-      order: order
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency,
     });
-  } catch (err) {
-    console.error(err);
+
+  } catch (error) {
+    console.error("Error creating order:", error);
     res.status(500).json({ error: "Order creation failed" });
   }
 });
