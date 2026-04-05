@@ -6,65 +6,82 @@ require("dotenv").config();
 
 const app = express();
 
-// ✅ CORS FIX (IMPORTANT)
+// ✅ CORS (FIXED PROPERLY)
 app.use(cors({
-  origin: true,
+  origin: "*", // allow all (simple & works everywhere)
   methods: ["GET", "POST"],
-  credentials: true
 }));
 
 app.use(express.json());
 
+// ✅ Razorpay Instance
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
+// ✅ Health Check
 app.get("/", (req, res) => {
   res.send("Glamora Backend Running 🚀");
 });
 
-// ✅ CREATE ORDER (POST)
+// ✅ CREATE ORDER
 app.post("/create-order", async (req, res) => {
   try {
     const { amount } = req.body;
 
+    if (!amount) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
     const options = {
-      amount: amount * 100, // ₹ to paise
+      amount: amount * 100, // ₹ → paise
       currency: "INR",
-      receipt: "receipt_order_" + Date.now(),
+      receipt: "receipt_" + Date.now(),
     };
 
     const order = await razorpay.orders.create(options);
 
-    console.log("ORDER CREATED:", order); // DEBUG
+    console.log("ORDER CREATED:", order);
 
-    res.json({
+    return res.json({
       id: order.id,
       amount: order.amount,
       currency: order.currency,
     });
 
   } catch (error) {
-    console.error("Error creating order:", error);
-    res.status(500).json({ error: "Order creation failed" });
+    console.error("❌ RAZORPAY ERROR:", error);
+    return res.status(500).json({
+      error: "Failed to create order",
+      details: error.message,
+    });
   }
 });
 
 // ✅ VERIFY PAYMENT
 app.post("/verify-payment", (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-  const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
 
-  const expected = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-    .update(body)
-    .digest("hex");
+    const expected = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
 
-  res.json({ success: expected === razorpay_signature });
+    const isValid = expected === razorpay_signature;
+
+    res.json({ success: isValid });
+
+  } catch (error) {
+    console.error("Verification Error:", error);
+    res.status(500).json({ success: false });
+  }
 });
 
-app.listen(process.env.PORT || 5000, () =>
-  console.log("Server Started 🚀")
-);
+// ✅ START SERVER
+app.listen(process.env.PORT || 5000, () => {
+  console.log("🚀 Server Started");
+});
