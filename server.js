@@ -65,6 +65,7 @@ app.post("/create-order", async (req, res) => {
 // ✅ VERIFY PAYMENT + SAVE PREMIUM
 app.post("/verify-payment", (req, res) => {
   try {
+    console.log("BODY:", req.body);
     const {
       razorpay_order_id,
       razorpay_payment_id,
