@@ -6,7 +6,7 @@ require("dotenv").config();
 
 const app = express();
 
-// ✅ CORS (FULL FIX)
+// ✅ CORS (FULL SAFE CONFIG)
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "OPTIONS"],
@@ -24,14 +24,17 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// ✅ Health Check
+// ✅ Health Check (for Render wakeup)
 app.get("/", (req, res) => {
+  console.log("🌐 Health check hit");
   res.send("Glamora Backend Running 🚀");
 });
 
 // ✅ CREATE ORDER
 app.post("/create-order", async (req, res) => {
   try {
+    console.log("📦 CREATE ORDER HIT:", req.body);
+
     const { amount } = req.body;
 
     if (!amount) {
@@ -46,7 +49,7 @@ app.post("/create-order", async (req, res) => {
 
     const order = await razorpay.orders.create(options);
 
-    console.log("ORDER CREATED:", order);
+    console.log("✅ ORDER CREATED:", order.id);
 
     return res.json({
       id: order.id,
@@ -66,7 +69,8 @@ app.post("/create-order", async (req, res) => {
 // ✅ VERIFY PAYMENT + SAVE PREMIUM
 app.post("/verify-payment", (req, res) => {
   try {
-    console.log("BODY:", req.body);
+    console.log("🔥 VERIFY API HIT");
+    console.log("📩 BODY RECEIVED:", req.body);
 
     const {
       razorpay_order_id,
@@ -75,17 +79,23 @@ app.post("/verify-payment", (req, res) => {
       userId
     } = req.body;
 
+    // ❗ Validation check
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      console.log("❌ Missing payment fields");
+      return res.status(400).json({ success: false, error: "Missing fields" });
+    }
+
     // 🔐 Signature verification
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
 
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body.toString())
+      .update(body)
       .digest("hex");
 
     const isValid = expected === razorpay_signature;
 
-    console.log("SIGNATURE VALID:", isValid);
+    console.log("🔐 SIGNATURE VALID:", isValid);
 
     if (isValid && userId) {
       users[userId] = {
@@ -93,9 +103,9 @@ app.post("/verify-payment", (req, res) => {
         paymentId: razorpay_payment_id,
       };
 
-      console.log("✅ PREMIUM SAVED:", users[userId]);
+      console.log("✅ PREMIUM SAVED FOR USER:", userId);
     } else {
-      console.log("❌ PAYMENT NOT VERIFIED");
+      console.log("❌ PAYMENT NOT VERIFIED OR USERID MISSING");
     }
 
     return res.json({ success: isValid });
@@ -108,7 +118,11 @@ app.post("/verify-payment", (req, res) => {
 
 // ✅ CHECK PREMIUM STATUS
 app.get("/check-premium/:userId", (req, res) => {
-  const user = users[req.params.userId];
+  const userId = req.params.userId;
+
+  console.log("🔍 CHECK PREMIUM FOR:", userId);
+
+  const user = users[userId];
 
   return res.json({
     isPremium: user?.isPremium || false
