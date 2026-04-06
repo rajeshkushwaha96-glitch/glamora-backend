@@ -6,10 +6,11 @@ require("dotenv").config();
 
 const app = express();
 
-// ✅ CORS
+// ✅ CORS (FULL FIX)
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use(express.json());
@@ -66,6 +67,7 @@ app.post("/create-order", async (req, res) => {
 app.post("/verify-payment", (req, res) => {
   try {
     console.log("BODY:", req.body);
+
     const {
       razorpay_order_id,
       razorpay_payment_id,
@@ -73,28 +75,34 @@ app.post("/verify-payment", (req, res) => {
       userId
     } = req.body;
 
+    // 🔐 Signature verification
     const body = razorpay_order_id + "|" + razorpay_payment_id;
 
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body)
+      .update(body.toString())
       .digest("hex");
 
     const isValid = expected === razorpay_signature;
+
+    console.log("SIGNATURE VALID:", isValid);
 
     if (isValid && userId) {
       users[userId] = {
         isPremium: true,
         paymentId: razorpay_payment_id,
       };
+
       console.log("✅ PREMIUM SAVED:", users[userId]);
+    } else {
+      console.log("❌ PAYMENT NOT VERIFIED");
     }
 
-    res.json({ success: isValid });
+    return res.json({ success: isValid });
 
   } catch (error) {
-    console.error("Verification Error:", error);
-    res.status(500).json({ success: false });
+    console.error("❌ Verification Error:", error);
+    return res.status(500).json({ success: false });
   }
 });
 
@@ -102,10 +110,11 @@ app.post("/verify-payment", (req, res) => {
 app.get("/check-premium/:userId", (req, res) => {
   const user = users[req.params.userId];
 
-  res.json({
+  return res.json({
     isPremium: user?.isPremium || false
   });
 });
+
 // ✅ START SERVER
 app.listen(process.env.PORT || 5000, () => {
   console.log("🚀 Server Started");
